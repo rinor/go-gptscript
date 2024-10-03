@@ -214,6 +214,12 @@ func (r *Run) NextChat(ctx context.Context, input string) (*Run, error) {
 	return run, run.request(ctx, payload)
 }
 
+var requestHTTPClient *http.Client
+
+func RequestHTTPClient(httpClient *http.Client) {
+	requestHTTPClient = httpClient
+}
+
 func (r *Run) request(ctx context.Context, payload any) (err error) {
 	if r.state.IsTerminal() {
 		return fmt.Errorf("run is in terminal state and cannot be run again: state %q", r.state)
@@ -252,8 +258,11 @@ func (r *Run) request(ctx context.Context, payload any) (err error) {
 	if r.opts.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+r.opts.Token)
 	}
+	if requestHTTPClient == nil {
+		requestHTTPClient = http.DefaultClient
+	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := requestHTTPClient.Do(req)
 	if err != nil {
 		r.state = Error
 		r.err = fmt.Errorf("failed to make request: %w", err)
@@ -414,7 +423,7 @@ func (r *Run) request(ctx context.Context, payload any) (err error) {
 			}
 		}
 
-		if err != nil && !errors.Is(err, io.EOF) {
+		if !errors.Is(err, io.EOF) {
 			slog.Debug("failed to read events from response", "error", err)
 			r.err = fmt.Errorf("failed to read events: %w", err)
 		}
